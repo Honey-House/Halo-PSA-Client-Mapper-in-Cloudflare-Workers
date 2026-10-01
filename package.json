@@ -6,7 +6,7 @@
   "license": "AGPL-3.0-or-later",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Honey-House-Tech/Halo-PSA-Client-Mapper-in-Cloudflare-Workers.git"
+    "url": "git+https://github.com/Honey-House/Halo-PSA-Client-Mapper-in-Cloudflare-Workers.git"
   },
   "scripts": {
     "dev": "wrangler dev",
