@@ -1,5 +1,7 @@
 # Halo PSA Client & Agent Map
 
+**API policy:** this is a browser tool with no integrator API and no OpenAPI document by design. See [docs/PUBLIC_API.md](docs/PUBLIC_API.md).
+
 A Cloudflare Worker that maps **Halo PSA agents** and **client organizations** on a dark-mode Leaflet map. Addresses come from Halo; geocoding runs in the browser via a Worker proxy to stay within Cloudflare limits.
 
 ## Features
