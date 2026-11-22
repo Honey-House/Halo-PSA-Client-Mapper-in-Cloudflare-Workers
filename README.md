@@ -88,6 +88,10 @@ When connecting this repo to **Workers Builds** (GitHub/GitLab), use:
 
 Set all required secrets on the Worker before the first deploy. The **Debug** tab in the app confirms whether each value is loaded (not the actual secret values).
 
+## Build standard
+
+See [the GHOBS adoption and handoff](docs/GHOBS.md) for local checks and the browser-only deployment scope.
+
 ## Contributing
 
 Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Please also review our [Code of Conduct](CODE_OF_CONDUCT.md).

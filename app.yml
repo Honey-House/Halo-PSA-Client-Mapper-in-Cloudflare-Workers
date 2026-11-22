@@ -1,0 +1,17 @@
+standard: ghobs/v1
+name: "Halo PSA Client Mapper"
+description: "Internal Cloudflare Worker that maps Halo PSA agents and client sites."
+audience: internal
+organization: "Honey House"
+brand_kit: "Honey-House/Honey-House-Branding-Marketing"
+platform: worker
+ui: desktop-admin
+api: false
+mcp: false
+docs:
+  mode: in-repo
+  repo: ""
+own_domains: ""
+exceptions:
+  CHK-001: "Run the vendored check before pushing. No GitHub Actions were added to this Worker; the existing Cloudflare deployment configuration is unchanged."
+  UPD-001: "Refresh the pinned standard by hand. Do not add scheduled GitHub jobs to this Worker."
