@@ -3,12 +3,12 @@
 ## Repository instructions
 
 1. Read `app.yml`, [the adoption and handoff notes](docs/GHOBS.md), and [the browser route and access policy](docs/PUBLIC_API.md) before modifying the Worker.
-2. Use the [repo Issues](https://github.com/Honey-House/Halo-PSA-Client-Mapper-in-Cloudflare-Workers/issues) tracker for non-sensitive work. Follow [SECURITY.md](SECURITY.md) for vulnerability reports. Keep real Halo data, credentials, private hostnames and access material out of issues, fixtures and handoffs.
+2. The [repo Issues](https://github.com/Honey-House/Halo-PSA-Client-Mapper-in-Cloudflare-Workers/issues) list is the authoritative tracker for public-safe work. Use its repository-qualified issue number, and keep the active item and [handoff](docs/GHOBS.md#handoff) there. Follow [SECURITY.md](SECURITY.md) for sensitive reports; do not open a public issue or mention any private case.
 3. Resume the GHOBS rollout from [docs/GHOBS.md](docs/GHOBS.md). For other unfinished work, the relevant issue or draft PR is the current handoff: record the repo/branch/commit or shared patch, owner, last verified result, blockers and next step. Check who is active and whether the remote branch moved before resuming.
 4. Run `python .ghobs/ghobs.py check` and `node --test tests/worker-smoke.test.mjs` locally. The smoke test needs Node 22.18+ and uses no external services.
 5. This Worker has browser transport routes, not a supported integration API. Do not add public OpenAPI, Swagger or MCP endpoints to satisfy the standard. Preserve Cloudflare Access and the disabled `workers.dev` and preview URLs. Adoption itself does not authorize a deployment or access change.
 
-<!-- GHOBS:BEGIN v0.1.10 -->
+<!-- GHOBS:BEGIN v0.1.12 -->
 ## Good Heart Open Build Standard (GHOBS)
 
 This repo follows GHOBS `ghobs/v1`. Full rules: https://github.com/Good-Heart-Tech/Good-Heart-Open-Build-Standard (rules/ folder, one short file per rule). A repo-specific note outside this block wins over this block, and a recorded exception in app.yml wins over a rule.
@@ -31,7 +31,9 @@ Always:
 - Docker apps: persistent data lives under `/data`, and the data volume is mounted at `/data` by default.
 - Placeholder values are fictional or satirical only. No real people or organizations.
 - Never commit secrets, databases or client data.
-- Work must be resumable across AI tools. Use the linked project tracker and handoff, not private chats. Before pausing unfinished work, save it to an approved shared location and record the ref, progress, blockers, test results and next step (AI-002).
+- Work must be resumable across AI tools. Link one canonical tracker from `AGENTS.md`; update the same item by stable ID with state, owner, priority, acceptance and completion evidence (WORK-001). Use that item and its handoff, not private chats. Before pausing unfinished work, save it to an approved shared location and record the ref, progress, blockers, test results and next step (AI-002).
 - Keep docs current in the same change as the code, in `docs/` or the docs repo named in `app.yml`.
 - When you notice the same code or style in a second repo, say so and suggest consolidating. Do not extract it without asking.
+
+For sites meant for public discovery, set optional `website: public` and follow WEB-001 through WEB-004. Ship a reviewed sitemap, robots.txt and llms.txt with only approved public discovery URLs. Keep private and intentionally unindexed routes out; check accessibility even for unindexed public-facing pages. Run the public website review checklist; a local check is not proof of indexing or accessibility.
 <!-- GHOBS:END -->
