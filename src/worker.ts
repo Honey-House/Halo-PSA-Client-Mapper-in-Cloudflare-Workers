@@ -1081,6 +1081,7 @@ function getPageHtml(title: string): string {
     .panel { display: none; flex: 1; min-height: 0; flex-direction: column; }
     .panel.active { display: flex; }
     #map { flex: 1; min-height: 0; background: #0d1117; }
+    #map .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.9) saturate(0.6); }
     #debugPanel {
       flex: 1;
       min-height: 0;
@@ -1251,9 +1252,10 @@ function getPageHtml(title: string): string {
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
     const map = L.map("map", { zoomControl: true }).setView([39.5, -98.35], 4);
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; CARTO',
-      subdomains: "abcd",
+    // OSM tiles need no API key. CARTO basemaps now require one (watermark "API KEY REQUIRED").
+    // The tile-pane CSS filter in <style> darkens these to match the dark UI.
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       maxZoom: 19
     }).addTo(map);
 
