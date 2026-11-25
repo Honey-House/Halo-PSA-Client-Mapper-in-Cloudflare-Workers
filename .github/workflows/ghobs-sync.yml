@@ -1,0 +1,35 @@
+# Monthly: pull the latest GHOBS files into this repo and open one PR (never pushes to main).
+# While the standard repo is private, add a read-only token as the secret GHOBS_READ_TOKEN.
+name: ghobs-sync
+on:
+  schedule:
+    - cron: "43 6 2 * *"
+  workflow_dispatch: {}
+concurrency: ghobs-sync
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: Good-Heart-Tech/Good-Heart-Open-Build-Standard
+          path: .ghobs-src
+          token: ${{ secrets.GHOBS_READ_TOKEN || github.token }}
+      - run: python .ghobs-src/scripts/ghobs.py sync --standard-dir .ghobs-src
+      - run: rm -rf .ghobs-src
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -z "$(git status --porcelain)" ]; then echo "Up to date"; exit 0; fi
+          git config user.name "ghobs-bot"
+          git config user.email "ghobs-bot@users.noreply.github.com"
+          git switch -C ghobs-sync
+          git add -A
+          git commit -m "Sync Good Heart Open Build Standard"
+          git push -f origin ghobs-sync
+          gh pr create --title "Sync Good Heart Open Build Standard" --body "Monthly sync of GHOBS instruction files, check script and version targets." || echo "PR already open"

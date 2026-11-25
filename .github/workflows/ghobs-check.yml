@@ -1,0 +1,13 @@
+# Advisory while rolling out. Remove --warn-only to make findings block merges.
+name: ghobs-check
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: python .ghobs/ghobs.py check --warn-only

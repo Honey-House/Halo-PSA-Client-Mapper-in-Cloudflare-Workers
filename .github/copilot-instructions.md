@@ -1,4 +1,4 @@
-<!-- GHOBS:BEGIN v0.1.12 -->
+<!-- GHOBS:BEGIN v0.1.13 -->
 ## Good Heart Open Build Standard (GHOBS)
 
 This repo follows GHOBS `ghobs/v1`. Full rules: https://github.com/Good-Heart-Tech/Good-Heart-Open-Build-Standard (rules/ folder, one short file per rule). A repo-specific note outside this block wins over this block, and a recorded exception in app.yml wins over a rule.

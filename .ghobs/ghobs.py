@@ -3,6 +3,7 @@
 
   python ghobs.py check [--path DIR] [--site-root DIR] [--warn-only] [--strict]
   python ghobs.py sync --standard-dir DIR [--path DIR] [--init]
+  python ghobs.py migrate-ai-rules [--path DIR]
 
 Rules live in the standard repo under rules/. Exceptions go in app.yml.
 """
@@ -19,6 +20,8 @@ from xml.etree import ElementTree
 
 BEGIN_RE = re.compile(r"<!-- GHOBS:BEGIN v([\w.\-]+) -->")
 END = "<!-- GHOBS:END -->"
+REPO_AI_BEGIN = "<!-- REPO-AI:BEGIN -->"
+REPO_AI_END = "<!-- REPO-AI:END -->"
 SKIP_DIRS = {".git", "node_modules", ".ghobs", ".ghobs-src", "vendor", "dist", "build", "__pycache__", ".venv", "venv"}
 CODE_EXT = {".html", ".htm", ".js", ".mjs", ".ts", ".tsx", ".jsx", ".css", ".py", ".jinja", ".j2", ".vue", ".svelte", ".astro"}
 MAX_BYTES = 1_000_000
@@ -173,7 +176,173 @@ def check_ai_files(root):
         text = read_text(root / name) if (root / name).exists() else None
         if extract_block(text) != block:
             out.append(f("AI-001", "ERROR", name, 0, "missing or differs from the AGENTS.md block (run sync)"))
+    out.extend(check_repo_ai_rules(root))
     return out
+
+
+def truthy(value):
+    return value is True or (isinstance(value, str) and value.strip().lower() in ("true", "yes", "1"))
+
+
+def parse_rule_frontmatter(text):
+    if not text.startswith("---\n"):
+        return {}, text
+    end = text.find("\n---\n", 4)
+    if end == -1:
+        return {}, text
+    meta = parse_yaml(text[4:end])
+    body = text[end + 5 :].lstrip("\n")
+    return meta if isinstance(meta, dict) else {}, body
+
+
+def list_docs_ai_sources(root):
+    ai_dir = root / "docs" / "ai"
+    if not ai_dir.is_dir():
+        return []
+    out = []
+    for path in sorted(ai_dir.glob("*.md")):
+        if path.name.lower() == "readme.md":
+            continue
+        meta, _ = parse_rule_frontmatter(path.read_text(encoding="utf-8"))
+        if meta.get("agent_rule") is False:
+            continue
+        if meta.get("sidebar_position") is not None:
+            continue
+        out.append(path)
+    return out
+
+
+def render_cursor_mdc(meta, body, stem):
+    desc = (meta.get("description") if meta else None) or stem.replace("-", " ").replace("_", " ").title()
+    lines = ["---", f"description: {desc}"]
+    if truthy(meta.get("alwaysApply", meta.get("always_apply") if meta else False)):
+        lines.append("alwaysApply: true")
+    elif meta and meta.get("globs"):
+        lines.append(f"globs: {meta.get('globs')}")
+    lines.append("---")
+    return "\n".join(lines) + "\n\n" + body.strip() + "\n"
+
+
+def build_repo_ai_index(rule_paths):
+    lines = [
+        "## Repo conventions (all AI tools)",
+        "",
+        "Canonical copies live in `docs/ai/`. Run `python .ghobs/ghobs.py sync` after editing those files.",
+        "Generated copies: `.cursor/rules/*.mdc` and the matching block in `.github/copilot-instructions.md`.",
+        "",
+    ]
+    for path in rule_paths:
+        body = parse_rule_frontmatter(path.read_text(encoding="utf-8"))[1]
+        title = body.strip().splitlines()[0].lstrip("#").strip() if body.strip() else path.stem
+        lines.append(f"- [{title}](docs/ai/{path.name})")
+    return "\n".join(lines)
+
+
+def expected_repo_ai_cursor_rules(root):
+    expected = {}
+    for path in list_docs_ai_sources(root):
+        text = path.read_text(encoding="utf-8")
+        meta, body = parse_rule_frontmatter(text)
+        expected[f"{path.stem}.mdc"] = render_cursor_mdc(meta, body, path.stem)
+    return expected
+
+
+def check_repo_ai_rules(root):
+    out = []
+    expected = expected_repo_ai_cursor_rules(root)
+    rules_dir = root / ".cursor" / "rules"
+    if not expected and not rules_dir.is_dir():
+        return out
+    for name, content in expected.items():
+        mdc = rules_dir / name
+        actual = read_text(mdc)
+        if actual != content:
+            out.append(f("AI-003", "WARN", mdc.relative_to(root), 0, "differs from docs/ai (run sync)"))
+    if rules_dir.is_dir():
+        for mdc in rules_dir.glob("*.mdc"):
+            if mdc.name == "ghobs.mdc":
+                continue
+            if mdc.name not in expected:
+                out.append(f("AI-003", "WARN", mdc.relative_to(root), 0, "orphan rule; migrate to docs/ai (migrate-ai-rules)"))
+    agents = read_text(root / "AGENTS.md")
+    if expected and REPO_AI_BEGIN not in (agents or ""):
+        out.append(f("AI-003", "WARN", "AGENTS.md", 0, "docs/ai rules exist but REPO-AI block missing (run sync)"))
+    return out
+
+
+def upsert_delimited(path, inner, begin, end, header=""):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    old = path.read_text(encoding="utf-8") if path.exists() else header
+    wrapped = f"{begin}\n{inner.rstrip()}\n{end}"
+    start = old.find(begin)
+    end_i = old.find(end, start) if start != -1 else -1
+    if start != -1 and end_i != -1:
+        new = old[:start] + wrapped + old[end_i + len(end) :]
+    else:
+        new = old.rstrip("\n") + ("\n\n" if old.strip() else "") + wrapped + "\n"
+    if not path.exists() or new != old:
+        path.write_text(new, encoding="utf-8", newline="\n")
+        return True
+    return False
+
+
+def sync_repo_ai_rules(root):
+    root = Path(root).resolve()
+    rule_paths = list_docs_ai_sources(root)
+    if not rule_paths:
+        return []
+    done = []
+    bodies = []
+    rules_dir = root / ".cursor" / "rules"
+    rules_dir.mkdir(parents=True, exist_ok=True)
+    expected_stems = {path.stem for path in rule_paths}
+    for mdc in list(rules_dir.glob("*.mdc")):
+        if mdc.name == "ghobs.mdc" or mdc.stem in expected_stems:
+            continue
+        mdc.unlink()
+        done.append(f"removed {mdc.relative_to(root)}")
+    for path in rule_paths:
+        meta, body = parse_rule_frontmatter(path.read_text(encoding="utf-8"))
+        mdc = render_cursor_mdc(meta, body, path.stem)
+        dest = rules_dir / f"{path.stem}.mdc"
+        if not dest.exists() or dest.read_text(encoding="utf-8") != mdc:
+            dest.write_text(mdc, encoding="utf-8", newline="\n")
+            done.append(str(dest.relative_to(root)))
+        bodies.append(body.strip())
+    index = build_repo_ai_index(rule_paths)
+    if upsert_delimited(root / "AGENTS.md", index, REPO_AI_BEGIN, REPO_AI_END):
+        done.append("AGENTS.md REPO-AI")
+    combined = "\n\n---\n\n".join(bodies)
+    if upsert_delimited(root / ".github" / "copilot-instructions.md", combined, REPO_AI_BEGIN, REPO_AI_END):
+        done.append(".github/copilot-instructions.md REPO-AI")
+    return done
+
+
+def migrate_ai_rules(root):
+    root = Path(root).resolve()
+    rules_dir = root / ".cursor" / "rules"
+    if not rules_dir.is_dir():
+        print("migrate-ai-rules: no .cursor/rules")
+        return 0
+    ai_dir = root / "docs" / "ai"
+    ai_dir.mkdir(parents=True, exist_ok=True)
+    migrated = []
+    for mdc in sorted(rules_dir.glob("*.mdc")):
+        if mdc.name == "ghobs.mdc":
+            continue
+        dest = ai_dir / f"{mdc.stem}.md"
+        if dest.exists():
+            continue
+        text = mdc.read_text(encoding="utf-8")
+        if not text.startswith("---\n"):
+            text = f"---\ndescription: {mdc.stem.replace('-', ' ')}\nalwaysApply: true\n---\n\n{text}"
+        dest.write_text(text, encoding="utf-8", newline="\n")
+        migrated.append(dest.relative_to(root))
+    if migrated:
+        print("migrate-ai-rules: " + ", ".join(str(p) for p in migrated))
+    else:
+        print("migrate-ai-rules: nothing to migrate")
+    return 0
 
 
 def scan_lines(files, root, exts, pattern, rule, level, msg, limit=5):
@@ -426,6 +595,7 @@ def run_sync(root, standard_dir, init=False):
             done.append(f".github/workflows/{name}")
     if init and copy_if_changed(std / "templates" / "app.yml", root / "app.yml", overwrite=False):
         done.append("app.yml")
+    done.extend(sync_repo_ai_rules(root))
     print(("GHOBS sync updated: " + ", ".join(done)) if done else "GHOBS sync: already up to date")
     return 0
 
@@ -442,9 +612,13 @@ def main(argv=None):
     syn.add_argument("--path", default=".")
     syn.add_argument("--standard-dir", required=True)
     syn.add_argument("--init", action="store_true", help="also create app.yml if missing")
+    mig = sub.add_parser("migrate-ai-rules", help="copy .cursor/rules/*.mdc into docs/ai/ (except ghobs.mdc)")
+    mig.add_argument("--path", default=".")
     args = parser.parse_args(argv)
     if args.cmd == "check":
         return run_check(args.path, args.warn_only, args.strict, args.site_root)
+    if args.cmd == "migrate-ai-rules":
+        return migrate_ai_rules(args.path)
     return run_sync(args.path, args.standard_dir, args.init)
 
 
